@@ -15,6 +15,8 @@ concurrency:
 
 env:
   ECR_REPOSITORY: go-cloud-native-app
+  EKS_CLUSTER: gcn
+  APP_NAMESPACE: gcn
 
 jobs:
   test:
@@ -116,6 +118,99 @@ jobs:
             echo "### Image pushed :rocket:"
             echo ""
             echo "\`${{ steps.image.outputs.uri }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+  cluster-check:
+    name: Check EKS cluster
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      active: ${{ steps.cluster.outputs.active }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gha-${{ github.run_id }}
+
+      - name: Is the cluster running?
+        id: cluster
+        run: |
+          status="$(aws eks describe-cluster --name "$EKS_CLUSTER" --query cluster.status --output text 2>/dev/null || echo MISSING)"
+          echo "Cluster $EKS_CLUSTER status: $status"
+          if [ "$status" = "ACTIVE" ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::EKS cluster '$EKS_CLUSTER' is $status, so deploy is skipped. The image is still in ECR."
+          fi
+
+  deploy:
+    name: Deploy to EKS
+    needs: [publish, cluster-check]
+    if: needs.cluster-check.outputs.active == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-eks
+      cancel-in-progress: false
+    env:
+      IMAGE: ${{ needs.publish.outputs.image }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gha-${{ github.run_id }}
+
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
+
+      - name: Pin image to this commit
+        working-directory: k8s/overlays/eks
+        run: kustomize edit set image "go-cloud-native-app=$IMAGE"
+
+      - name: Show rendered manifests
+        run: kubectl kustomize k8s/overlays/eks
+
+      - name: Apply manifests
+        run: kubectl apply -k k8s/overlays/eks
+
+      - name: Wait for rollout (roll back on failure)
+        run: |
+          if ! kubectl -n "$APP_NAMESPACE" rollout status deployment/api --timeout=180s; then
+            echo "::error::Rollout of $IMAGE failed, rolling back to the previous version"
+            kubectl -n "$APP_NAMESPACE" get pods -o wide
+            kubectl -n "$APP_NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 25
+            kubectl -n "$APP_NAMESPACE" rollout undo deployment/api
+            kubectl -n "$APP_NAMESPACE" rollout status deployment/api --timeout=120s
+            exit 1
+          fi
+
+      - name: Smoke test from inside the cluster
+        run: |
+          kubectl -n "$APP_NAMESPACE" run "smoke-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --rm -i --restart=Never --image=busybox:1.37 \
+            -- wget -qO- -T 5 http://api/healthz
+
+      - name: Write job summary
+        run: |
+          {
+            echo "### Deployed to EKS :white_check_mark:"
+            echo ""
+            echo "- Cluster: \`$EKS_CLUSTER\`, namespace: \`$APP_NAMESPACE\`"
+            echo "- Image: \`$IMAGE\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
 

@@ -39,3 +39,9 @@ variable "github_oidc_sub_prefix" {
   type        = string
   default     = "repo:vivek-ted@13916323/go-cloud-native-app@1470095668"
 }
+
+variable "eks_cluster_name" {
+  description = "EKS cluster the CI role may look up (to build a kubeconfig)."
+  type        = string
+  default     = "gcn"
+}

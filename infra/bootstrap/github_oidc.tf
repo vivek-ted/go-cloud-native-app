@@ -58,6 +58,13 @@ data "aws_iam_policy_document" "ecr_push" {
     ]
     resources = [aws_ecr_repository.app.arn]
   }
+  
+  statement {
+    sid       = "EksDescribeForKubeconfig"
+    effect    = "Allow"
+    actions   = ["eks:DescribeCluster"]
+    resources = ["arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${var.eks_cluster_name}"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions_ecr_push" {

@@ -85,3 +85,15 @@ variable "node_max_size" {
   type        = number
   default     = 3
 }
+
+variable "app_namespace" {
+  description = "Namespace the application is deployed into; CI may only deploy here."
+  type        = string
+  default     = "gcn"
+}
+
+variable "github_actions_role_name" {
+  description = "Name of the CI role created by the bootstrap stack."
+  type        = string
+  default     = "gcn-github-actions"
+}
