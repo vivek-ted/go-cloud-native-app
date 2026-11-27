@@ -1,0 +1,12 @@
+# Settings for the Traefik Helm chart (v43.x) on kind.
+service:
+  spec:
+    type: NodePort        # no cloud LB on kind → expose via NodePort + kind port mapping
+ports:
+  web:
+    nodePort: 30000       # must match kind/cluster.yaml containerPort
+  websecure:
+    nodePort: 30443
+ingressClass:
+  enabled: true
+  isDefaultClass: false   # force every Ingress to say ingressClassName explicitly
