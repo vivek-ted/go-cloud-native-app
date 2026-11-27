@@ -33,3 +33,9 @@ variable "images_to_keep" {
   type        = number
   default     = 10
 }
+
+variable "github_oidc_sub_prefix" {
+  description = "Subject prefix GitHub puts in this repo's OIDC tokens. Find it with: gh api repos/OWNER/REPO/actions/oidc/customization/sub --jq .sub_claim_prefix"
+  type        = string
+  default     = "repo:vivek-ted@13916323/go-cloud-native-app@1470095668"
+}
