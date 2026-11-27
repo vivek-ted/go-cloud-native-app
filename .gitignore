@@ -3,3 +3,8 @@ bin/
 *.out
 .DS_Store
 CLAUDE.md
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
