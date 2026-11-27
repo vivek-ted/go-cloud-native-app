@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - path: zone-spread.yaml
+images:
+  - name: go-cloud-native-app
+    newName: go-cloud-native-app   # CI replaces this with <registry>/go-cloud-native-app
+    newTag: set-by-ci              # CI replaces this with the git SHA
