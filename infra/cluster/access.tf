@@ -5,10 +5,11 @@ resource "kubernetes_namespace_v1" "app" {
 
     labels = {
       "app.kubernetes.io/managed-by" = "terraform"
+      "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
     }
   }
 
-  depends_on = [aws_eks_node_group.default]
+  depends_on = [aws_eks_node_group.default, helm_release.lbc]
 }
 
 data "aws_iam_role" "github_actions" {
