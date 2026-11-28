@@ -97,3 +97,9 @@ variable "github_actions_role_name" {
   type        = string
   default     = "gcn-github-actions"
 }
+
+variable "lbc_chart_version" {
+  description = "AWS Load Balancer Controller Helm chart version. Keep in sync with the IAM policy file in policies/."
+  type        = string
+  default     = "3.6.3"
+}
